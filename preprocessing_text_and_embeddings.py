@@ -1,33 +1,27 @@
 
-import os, fitz, boto3, requests
+import os, boto3, requests
 from langchain.text_splitter import TokenTextSplitter
 from sentence_transformers import SentenceTransformer
 from annoy import AnnoyIndex
+from bs4 import BeautifulSoup
 from io import BytesIO
 
 
-PDF_INFO_FILE = os.getenv("PDF_INFO_FILE")
+WEBPAGE_URL = os.getenv("WEBPAGE_URL")
 
-# Extraer el texto desde el archivo
-def extract_text_from_pdf_from_url(pdf_url):
-    """Extrae el texto desde un archivo PDF disponible en una URL."""
-    response = requests.get(pdf_url)
+# Extraer el texto desde la página web
+def extract_text_from_webpage(url):
+    """Extrae el texto desde una página web."""
+    response = requests.get(url)
     response.raise_for_status()  # Lanza un error si la descarga falla
 
-    # Usar BytesIO para manejar el archivo como flujo de bytes
-    pdf_stream = BytesIO(response.content)
-    document = fitz.open(stream=pdf_stream, filetype="pdf")
-
-    text = ""
-    for page_num in range(document.page_count):
-        page = document.load_page(page_num)
-        text += page.get_text()
+    # Usar BeautifulSoup para analizar el HTML
+    soup = BeautifulSoup(response.content, "html.parser")
+    text = soup.get_text(separator="\n")  # Obtener el texto plano de la página
 
     return text
 
 # Crear chunks del documento usando langchain
-
-
 def split_text_into_chunks(file_content, chunk_size=100, chunk_overlap=10):
     text_splitter = TokenTextSplitter(
         chunk_size=chunk_size, chunk_overlap=chunk_overlap
@@ -35,31 +29,24 @@ def split_text_into_chunks(file_content, chunk_size=100, chunk_overlap=10):
     chunks = text_splitter.split_text(file_content)
     return chunks
 
-# Extraer el texto desde el archivo
-text = extract_text_from_pdf_from_url(PDF_INFO_FILE)
+# Extraer el texto desde la página web
+text = extract_text_from_webpage(WEBPAGE_URL)
 text_chunks = split_text_into_chunks(text)
-
 
 # Guardar los chunks en un archivo
 with open("text_chunks.txt", "w") as f:
     for chunk in text_chunks:
         f.write(chunk + "\n")
 
-
-# """## Calcular Embeddings"""
-
-
+# Calcular Embeddings
 embeddings_model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
 
-# # Convertir los fragmentos en vectores
+# Convertir los fragmentos en vectores
 chunk_vectors = embeddings_model.encode(text_chunks)
 
-# """## Insertar los datos un base de datos vectorial"""
-
-
+# Insertar los datos en una base de datos vectorial
 # Definir el número de dimensiones de los vectores
 vector_dim = chunk_vectors.shape[1]
-
 
 # Crear un índice Annoy
 annoy_index = AnnoyIndex(vector_dim, "angular")
@@ -74,4 +61,3 @@ annoy_index.build(n_trees)
 
 # Guardar el índice en un archivo
 annoy_index.save("chunk_vectors.ann")
-
