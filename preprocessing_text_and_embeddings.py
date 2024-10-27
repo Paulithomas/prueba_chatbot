@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from io import BytesIO
 
 
-WEBPAGE_URL = os.getenv("WEBPAGE_URL")
+WEBPAGE_URL = os.getenv("https://www.cmfeduca.cl/educa/621/w3-article-1752.html")
 
 # Extraer el texto desde la página web
 def extract_text_from_webpage(url):
